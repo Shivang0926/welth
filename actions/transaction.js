@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
+import { sendEmail } from "./send-email";
+import EmailTemplate from "@/emails/template";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -13,6 +15,75 @@ const serializeAmount = (obj) => ({
   ...obj,
   amount: obj.amount.toNumber(),
 });
+
+// Helper function to check budget and send alert if needed
+async function checkBudgetAndAlert(userId, accountId) {
+  const budget = await db.budget.findFirst({
+    where: { userId },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+        }
+      }
+    }
+  });
+
+  if (!budget) return;
+
+  const startDate = new Date();
+  startDate.setDate(1); // Start of current month
+
+  const expenses = await db.transaction.aggregate({
+    where: {
+      userId,
+      accountId,
+      type: "EXPENSE",
+      date: {
+        gte: startDate,
+      },
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  const totalExpenses = expenses._sum.amount?.toNumber() || 0;
+  const budgetAmount = budget.amount.toNumber();
+  const percentageUsed = (totalExpenses / budgetAmount) * 100;
+
+  const account = await db.account.findUnique({
+    where: { id: accountId },
+    select: { name: true }
+  });
+
+  if (percentageUsed >= 80) {
+    try {
+      await sendEmail({
+        to: budget.user.email,
+        subject: `Budget Alert for ${account.name}`,
+        react: EmailTemplate({
+          userName: budget.user.name,
+          type: "budget-alert",
+          data: {
+            percentageUsed,
+            budgetAmount: `₹${budgetAmount.toFixed(2)}`,
+            totalExpenses: `₹${totalExpenses.toFixed(2)}`,
+            accountName: account.name,
+          },
+        }),
+      });
+
+      await db.budget.update({
+        where: { id: budget.id },
+        data: { lastAlertSent: new Date() },
+      });
+    } catch (error) {
+      console.error("Failed to send budget alert:", error);
+    }
+  }
+}
 
 // Create Transaction
 export async function createTransaction(data) {
@@ -89,6 +160,11 @@ export async function createTransaction(data) {
 
       return newTransaction;
     });
+
+    // Check budget after creating an expense
+    if (data.type === "EXPENSE") {
+      await checkBudgetAndAlert(user.id, data.accountId);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath(`/account/${transaction.accountId}`);
@@ -184,6 +260,11 @@ export async function updateTransaction(id, data) {
 
       return updated;
     });
+
+    // Check budget after updating a transaction that might affect the budget
+    if (data.type === "EXPENSE" || data.amount) {
+      await checkBudgetAndAlert(user.id, data.accountId || transaction.accountId);
+    }
 
     revalidatePath("/dashboard");
     revalidatePath(`/account/${data.accountId}`);

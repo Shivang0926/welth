@@ -35,12 +35,10 @@ const PREVIEW_DATA = {
     },
   },
   budgetAlert: {
-    userName: "John Doe",
+    userName: "",
     type: "budget-alert",
     data: {
-      percentageUsed: 85,
-      budgetAmount: 4000,
-      totalExpenses: 3400,
+      
     },
   },
 };
@@ -68,16 +66,16 @@ export default function EmailTemplate({
             <Section style={styles.statsContainer}>
               <div style={styles.stat}>
                 <Text style={styles.text}>Total Income</Text>
-                <Text style={styles.heading}>${data?.stats.totalIncome}</Text>
+                <Text style={styles.heading}>₹{data?.stats.totalIncome}</Text>
               </div>
               <div style={styles.stat}>
                 <Text style={styles.text}>Total Expenses</Text>
-                <Text style={styles.heading}>${data?.stats.totalExpenses}</Text>
+                <Text style={styles.heading}>₹{data?.stats.totalExpenses}</Text>
               </div>
               <div style={styles.stat}>
                 <Text style={styles.text}>Net</Text>
                 <Text style={styles.heading}>
-                  ${data?.stats.totalIncome - data?.stats.totalExpenses}
+                  ₹{data?.stats.totalIncome - data?.stats.totalExpenses}
                 </Text>
               </div>
             </Section>
@@ -90,7 +88,7 @@ export default function EmailTemplate({
                   ([category, amount]) => (
                     <div key={category} style={styles.row}>
                       <Text style={styles.text}>{category}</Text>
-                      <Text style={styles.text}>${amount}</Text>
+                      <Text style={styles.text}>₹{amount}</Text>
                     </div>
                   )
                 )}
@@ -123,31 +121,33 @@ export default function EmailTemplate({
     return (
       <Html>
         <Head />
-        <Preview>Budget Alert</Preview>
+        <Preview>Budget Alert - {data?.percentageUsed.toFixed(1)}% of budget used</Preview>
         <Body style={styles.body}>
           <Container style={styles.container}>
             <Heading style={styles.title}>Budget Alert</Heading>
             <Text style={styles.text}>Hello {userName},</Text>
             <Text style={styles.text}>
-              You&rsquo;ve used {data?.percentageUsed.toFixed(1)}% of your
-              monthly budget.
+              This is to inform you that you have used {data?.percentageUsed.toFixed(1)}% of your monthly budget for {data?.accountName}.
             </Text>
+
             <Section style={styles.statsContainer}>
               <div style={styles.stat}>
                 <Text style={styles.text}>Budget Amount</Text>
-                <Text style={styles.heading}>${data?.budgetAmount}</Text>
+                <Text style={styles.heading}>{data?.budgetAmount}</Text>
               </div>
               <div style={styles.stat}>
                 <Text style={styles.text}>Spent So Far</Text>
-                <Text style={styles.heading}>${data?.totalExpenses}</Text>
-              </div>
-              <div style={styles.stat}>
-                <Text style={styles.text}>Remaining</Text>
-                <Text style={styles.heading}>
-                  ${data?.budgetAmount - data?.totalExpenses}
-                </Text>
+                <Text style={styles.heading}>{data?.totalExpenses}</Text>
               </div>
             </Section>
+
+            <Text style={styles.text}>
+              Please review your spending to ensure you stay within your budget for this month.
+            </Text>
+
+            <Text style={styles.footer}>
+              Thank you for using Welth. Keep tracking your finances for better financial health!
+            </Text>
           </Container>
         </Body>
       </Html>
